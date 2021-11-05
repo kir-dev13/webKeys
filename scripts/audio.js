@@ -80,3 +80,100 @@ const getHz = (note = "A", octave = 4) => {
 
 const pressedNotes = new Map();
 let clickedKey = "";
+
+const playKey = (key) => {
+    if (!keys[key]) {
+        return;
+    }
+
+    const osc = audioContext.createOscillator();
+    const noteGainNode = audioContext.createGain();
+    noteGainNode.connect(audioContext.destination);
+
+    const zeroGain = 0.00001;
+    const maxGain = 0.5;
+    const sustainedGain = 0.001;
+
+    noteGainNode.gain.value = zeroGain;
+
+    const setAttack = () =>
+        noteGainNode.gain.exponentialRampToValueAtTime(
+            maxGain,
+            audioContext.currentTime + 0.01
+        );
+    const setDecay = () =>
+        noteGainNode.gain.exponentialRampToValueAtTime(
+            sustainedGain,
+            audioContext.currentTime + 1
+        );
+    const setRelease = () =>
+        noteGainNode.gain.exponentialRampToValueAtTime(
+            zeroGain,
+            audioContext.currentTime + 2
+        );
+
+    setAttack();
+    setDecay();
+    setRelease();
+
+    osc.connect(noteGainNode);
+    osc.type = "triangle";
+
+    const freq = getHz(keys[key].note, (keys[key].octaveOffset || 0) + 3);
+
+    if (Number.isFinite(freq)) {
+        osc.frequency.value = freq;
+    }
+
+    keys[key].element.classList.add("pressed");
+    pressedNotes.set(key, osc);
+    pressedNotes.get(key).start();
+};
+
+const stopKey = (key) => {
+    if (!keys[key]) {
+        return;
+    }
+
+    keys[key].element.classList.remove("pressed");
+    const osc = pressedNotes.get(key);
+
+    if (osc) {
+        setTimeout(() => {
+            osc.stop();
+        }, 2000);
+
+        pressedNotes.delete(key);
+    }
+};
+
+document.addEventListener("keydown", (e) => {
+    const eventKey = e.key.toUpperCase();
+    const key = eventKey === ";" ? "semicolon" : eventKey;
+
+    if (!key || pressedNotes.get(key)) {
+        return;
+    }
+    playKey(key);
+});
+
+document.addEventListener("keyup", (e) => {
+    const eventKey = e.key.toUpperCase();
+    const key = eventKey === ";" ? "semicolon" : eventKey;
+
+    if (!key) {
+        return;
+    }
+    stopKey(key);
+});
+
+for (const [key, { element }] of Object.entries(keys)) {
+    element.addEventListener("mousedown", () => {
+        playKey(key);
+        clickedKey = key;
+    });
+}
+
+document.addEventListener("mouseup", () => {
+    stopKey(clickedKey);
+});
